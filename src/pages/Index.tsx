@@ -1,9 +1,9 @@
-
 import React, { useState, useRef } from 'react';
 import { Mic, MicOff, Volume2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AIResponse {
   question: string;
@@ -71,19 +71,25 @@ const Index = () => {
 
   const sendAudioToBackend = async (audioBlob: Blob) => {
     try {
+      console.log('Sending audio to Supabase Edge Function...');
+      
       const formData = new FormData();
       formData.append('audio_file', audioBlob, 'recording.wav');
 
-      const response = await fetch('http://localhost:8000/ask', {
-        method: 'POST',
+      // Use Supabase Edge Function instead of localhost
+      const { data, error } = await supabase.functions.invoke('process-audio', {
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to get response from AI');
+      if (error) {
+        throw error;
       }
 
-      const data: AIResponse = await response.json();
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      console.log('Response received:', data);
       setResponse(data);
       
       toast({
@@ -104,7 +110,7 @@ const Index = () => {
 
   const playAudio = () => {
     if (response?.audio_url) {
-      const audio = new Audio(`http://localhost:8000${response.audio_url}`);
+      const audio = new Audio(response.audio_url);
       audio.play().catch(error => {
         console.error('Error playing audio:', error);
         toast({
