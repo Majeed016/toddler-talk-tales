@@ -1,5 +1,6 @@
+
 import React, { useState, useRef } from 'react';
-import { Mic, MicOff, Volume2, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Volume2, Loader2, Sparkles, Brain, Camera, Speaker } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -125,82 +126,142 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-50 to-pink-100 p-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
+        {/* Enhanced Header */}
         <div className="text-center mb-8 pt-8">
-          <h1 className="text-5xl font-bold text-purple-600 mb-4">
-            🤖 Toddler AI
-          </h1>
-          <p className="text-xl text-gray-700 font-medium">
-            Ask me anything and I'll explain it in a fun way! 🌟
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="animate-bounce">
+              <Sparkles className="w-12 h-12 text-yellow-500" />
+            </div>
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-pink-600 bg-clip-text text-transparent">
+              Toddler AI
+            </h1>
+            <div className="animate-bounce delay-150">
+              <Brain className="w-12 h-12 text-pink-500" />
+            </div>
+          </div>
+          <p className="text-2xl text-gray-700 font-medium bg-white/50 rounded-full px-6 py-3 inline-block shadow-lg">
+            Ask me anything and I'll explain it in a fun way! 🌟✨
           </p>
         </div>
 
-        {/* Recording Section */}
-        <Card className="mb-8 border-0 shadow-2xl bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-8 text-center">
-            <div className="mb-6">
-              <div className={`inline-flex items-center justify-center w-32 h-32 rounded-full transition-all duration-300 ${
+        {/* Enhanced Recording Section */}
+        <Card className="mb-8 border-0 shadow-2xl bg-white/90 backdrop-blur-sm overflow-hidden">
+          <CardContent className="p-10 text-center relative">
+            {/* Animated background pattern */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-4 left-4 w-8 h-8 bg-yellow-400 rounded-full animate-pulse"></div>
+              <div className="absolute top-8 right-8 w-6 h-6 bg-pink-400 rounded-full animate-pulse delay-300"></div>
+              <div className="absolute bottom-8 left-8 w-4 h-4 bg-blue-400 rounded-full animate-pulse delay-700"></div>
+              <div className="absolute bottom-4 right-4 w-10 h-10 bg-purple-400 rounded-full animate-pulse delay-500"></div>
+            </div>
+            
+            <div className="mb-8 relative z-10">
+              <div className={`relative inline-flex items-center justify-center w-40 h-40 rounded-full transition-all duration-500 transform ${
                 isRecording 
-                  ? 'bg-red-500 shadow-lg shadow-red-300 animate-pulse' 
-                  : 'bg-green-500 shadow-lg shadow-green-300 hover:shadow-xl'
+                  ? 'bg-gradient-to-r from-red-400 to-red-600 shadow-2xl shadow-red-300 animate-pulse scale-110' 
+                  : isLoading
+                  ? 'bg-gradient-to-r from-yellow-400 to-orange-500 shadow-2xl shadow-yellow-300 animate-spin'
+                  : 'bg-gradient-to-r from-green-400 to-green-600 shadow-2xl shadow-green-300 hover:shadow-3xl hover:scale-105'
               }`}>
+                {/* Outer glow ring */}
+                <div className={`absolute inset-0 rounded-full ${
+                  isRecording ? 'animate-ping bg-red-400' : 
+                  isLoading ? 'animate-spin bg-yellow-400' : 
+                  'bg-green-400 group-hover:animate-pulse'
+                } opacity-20`}></div>
+                
                 <Button
                   onClick={isRecording ? stopRecording : startRecording}
                   disabled={isLoading}
-                  className={`w-full h-full rounded-full text-white font-bold text-lg border-0 transition-all duration-300 ${
+                  className={`w-32 h-32 rounded-full text-white font-bold text-xl border-0 transition-all duration-300 shadow-lg ${
                     isRecording 
-                      ? 'bg-red-500 hover:bg-red-600' 
-                      : 'bg-green-500 hover:bg-green-600'
+                      ? 'bg-gradient-to-r from-red-500 to-red-700 hover:from-red-600 hover:to-red-800' 
+                      : isLoading
+                      ? 'bg-gradient-to-r from-yellow-500 to-orange-600 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-green-500 to-green-700 hover:from-green-600 hover:to-green-800'
                   }`}
                 >
                   {isLoading ? (
-                    <Loader2 className="w-12 h-12 animate-spin" />
+                    <Loader2 className="w-16 h-16 animate-spin" />
                   ) : isRecording ? (
-                    <MicOff className="w-12 h-12" />
+                    <MicOff className="w-16 h-16" />
                   ) : (
-                    <Mic className="w-12 h-12" />
+                    <Mic className="w-16 h-16" />
                   )}
                 </Button>
               </div>
             </div>
             
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold text-gray-800">
-                {isLoading ? '🤔 Thinking...' : isRecording ? '🎤 Listening...' : '👆 Press to Ask!'}
+            <div className="space-y-3 relative z-10">
+              <h2 className="text-3xl font-bold text-gray-800 flex items-center justify-center gap-3">
+                {isLoading ? (
+                  <>
+                    <Brain className="w-8 h-8 text-yellow-500 animate-bounce" />
+                    🤔 Thinking...
+                    <Sparkles className="w-8 h-8 text-yellow-500 animate-bounce delay-100" />
+                  </>
+                ) : isRecording ? (
+                  <>
+                    <Mic className="w-8 h-8 text-red-500 animate-pulse" />
+                    🎤 Listening...
+                    <div className="flex gap-1">
+                      <div className="w-2 h-6 bg-red-500 rounded animate-pulse"></div>
+                      <div className="w-2 h-8 bg-red-400 rounded animate-pulse delay-100"></div>
+                      <div className="w-2 h-6 bg-red-500 rounded animate-pulse delay-200"></div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-8 h-8 text-green-500" />
+                    👆 Press to Ask!
+                    <Brain className="w-8 h-8 text-green-500" />
+                  </>
+                )}
               </h2>
-              <p className="text-gray-600 text-lg">
-                {isLoading ? 'Getting you an awesome answer!' : isRecording ? 'Say your question clearly' : 'Tap the microphone and ask me anything!'}
+              <p className="text-gray-600 text-xl font-medium">
+                {isLoading ? 'Getting you an awesome answer! 🚀' : 
+                 isRecording ? 'Say your question clearly and loudly! 📢' : 
+                 'Tap the microphone and ask me anything you want to know! 🎯'}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Response Section */}
+        {/* Enhanced Response Section */}
         {response && (
-          <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur-sm">
+          <Card className="border-0 shadow-2xl bg-white/95 backdrop-blur-sm overflow-hidden">
             <CardContent className="p-8">
               <div className="space-y-6">
                 {/* Question */}
-                <div className="bg-blue-50 p-4 rounded-2xl border-l-4 border-blue-400">
-                  <h3 className="text-lg font-bold text-blue-800 mb-2">🗣️ Your Question:</h3>
-                  <p className="text-blue-700 text-lg">{response.question}</p>
+                <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-2xl border-l-6 border-blue-400 shadow-lg">
+                  <h3 className="text-xl font-bold text-blue-800 mb-3 flex items-center gap-2">
+                    <Mic className="w-6 h-6" />
+                    🗣️ Your Question:
+                  </h3>
+                  <p className="text-blue-700 text-lg font-medium">{response.question}</p>
                 </div>
 
                 {/* Explanation */}
-                <div className="bg-green-50 p-6 rounded-2xl border-l-4 border-green-400">
-                  <h3 className="text-xl font-bold text-green-800 mb-3">🧠 Here's what I know:</h3>
-                  <p className="text-green-700 text-lg leading-relaxed">{response.explanation}</p>
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border-l-6 border-green-400 shadow-lg">
+                  <h3 className="text-xl font-bold text-green-800 mb-4 flex items-center gap-2">
+                    <Brain className="w-6 h-6" />
+                    🧠 Here's what I know:
+                  </h3>
+                  <p className="text-green-700 text-lg leading-relaxed font-medium">{response.explanation}</p>
                 </div>
 
                 {/* Image */}
                 {response.image_url && (
-                  <div className="bg-yellow-50 p-6 rounded-2xl border-l-4 border-yellow-400">
-                    <h3 className="text-xl font-bold text-yellow-800 mb-4">🎨 Picture Time:</h3>
+                  <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-2xl border-l-6 border-yellow-400 shadow-lg">
+                    <h3 className="text-xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
+                      <Camera className="w-6 h-6" />
+                      🎨 Picture Time:
+                    </h3>
                     <div className="flex justify-center">
                       <img 
                         src={response.image_url} 
                         alt="Illustration for your question"
-                        className="max-w-full h-64 object-contain rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300"
+                        className="max-w-full h-72 object-contain rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-white"
                         onError={(e) => {
                           console.error('Image failed to load:', response.image_url);
                           (e.target as HTMLImageElement).style.display = 'none';
@@ -212,15 +273,18 @@ const Index = () => {
 
                 {/* Audio Player */}
                 {response.audio_url && (
-                  <div className="bg-purple-50 p-6 rounded-2xl border-l-4 border-purple-400">
-                    <h3 className="text-xl font-bold text-purple-800 mb-4">🔊 Listen to Me:</h3>
+                  <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-6 rounded-2xl border-l-6 border-purple-400 shadow-lg">
+                    <h3 className="text-xl font-bold text-purple-800 mb-4 flex items-center gap-2">
+                      <Speaker className="w-6 h-6" />
+                      🔊 Listen to Me:
+                    </h3>
                     <div className="flex justify-center">
                       <Button
                         onClick={playAudio}
-                        className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg hover:shadow-xl transition-all duration-300"
+                        className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white font-bold py-4 px-10 rounded-full text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
                       >
-                        <Volume2 className="w-6 h-6 mr-2" />
-                        Play Audio
+                        <Volume2 className="w-6 h-6 mr-3" />
+                        🎵 Play Audio
                       </Button>
                     </div>
                   </div>
@@ -230,11 +294,16 @@ const Index = () => {
           </Card>
         )}
 
-        {/* Footer */}
+        {/* Enhanced Footer */}
         <div className="text-center mt-8 pb-8">
-          <p className="text-gray-600 text-lg">
-            Keep asking questions! Learning is fun! 🚀
-          </p>
+          <div className="bg-white/70 rounded-full px-8 py-4 inline-block shadow-lg">
+            <p className="text-gray-700 text-xl font-medium flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-yellow-500" />
+              Keep asking questions! Learning is fun! 
+              <Brain className="w-6 h-6 text-pink-500" />
+              🚀
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -76,10 +76,8 @@ async function transcribeAudio(audioFile: File): Promise<string> {
   try {
     console.log('Starting transcription with Whisper...');
     
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
+    // Use the updated OpenAI API key
+    const openaiApiKey = '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';
     
     const formData = new FormData();
     formData.append('file', audioFile);
@@ -122,10 +120,8 @@ async function generateAIResponse(question: string): Promise<string> {
   try {
     console.log('Generating AI response for question:', question);
     
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
+    // Use the updated OpenAI API key
+    const openaiApiKey = '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';
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -138,7 +134,7 @@ async function generateAIResponse(question: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a cheerful, educational AI assistant for toddlers aged 2-4 years old. Always answer questions in simple, fun language that toddlers can understand. Use emojis to make it more engaging. Keep your answers short (2-3 sentences maximum) and always be positive and encouraging. Make sure to directly answer the specific question asked.'
+            content: 'You are a cheerful, educational AI assistant for toddlers aged 2-4 years old. Always answer questions in simple, fun language that toddlers can understand. Use emojis to make it more engaging. Keep your answers short (2-3 sentences maximum) and always be positive and encouraging. Make sure to directly answer the specific question asked. Be accurate and educational while keeping it simple.'
           },
           {
             role: 'user',
