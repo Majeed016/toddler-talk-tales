@@ -16,92 +16,172 @@ interface AIResponse {
 const Index = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [response, setResponse] = useState<AIResponse | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      console.log('🎤 Starting recording...');
+      
+      // Stop any existing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        setIsPlayingAudio(false);
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100
+        } 
+      });
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
+      
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
+        console.log('📊 Audio data available:', event.data.size);
         if (event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/wav' });
+        console.log('⏹️ Recording stopped, processing audio...');
+        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        console.log('📦 Audio blob size:', audioBlob.size);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => {
+          track.stop();
+          console.log('🛑 Stopped track:', track.kind);
+        });
+        
         await sendAudioToBackend(audioBlob);
-        stream.getTracks().forEach(track => track.stop());
       };
 
-      mediaRecorder.start();
+      mediaRecorder.onerror = (event) => {
+        console.error('❌ MediaRecorder error:', event);
+        toast({
+          title: "🚫 Recording Error",
+          description: "Something went wrong with recording. Please try again!",
+          variant: "destructive",
+        });
+        setIsRecording(false);
+      };
+
+      mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
       
       toast({
-        title: "🎤 Recording started!",
-        description: "Ask your question now...",
+        title: "🎤 Recording Started! 🎵",
+        description: "Speak clearly and ask your question! 🗣️✨",
       });
+      
+      console.log('✅ Recording started successfully');
     } catch (error) {
-      console.error('Error starting recording:', error);
+      console.error('❌ Error starting recording:', error);
       toast({
-        title: "Error",
-        description: "Could not start recording. Please check microphone permissions.",
+        title: "🚫 Microphone Error",
+        description: "Could not access microphone. Please check permissions! 🎤❌",
         variant: "destructive",
       });
+      setIsRecording(false);
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    console.log('🛑 Stopping recording...');
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
       setIsLoading(true);
       
       toast({
-        title: "🔄 Processing...",
-        description: "Thinking about your question!",
+        title: "🔄 Processing Your Question... 🧠",
+        description: "I'm thinking about your amazing question! ⚡🤔",
       });
+      
+      console.log('✅ Recording stop initiated');
+    } else {
+      console.warn('⚠️ MediaRecorder not active or not available');
+      setIsRecording(false);
+    }
+  };
+
+  const handleRecordingClick = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    console.log('🖱️ Recording button clicked. Current state:', { isRecording, isLoading });
+    
+    if (isLoading) {
+      console.log('⏳ Currently loading, ignoring click');
+      return;
+    }
+    
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
     }
   };
 
   const sendAudioToBackend = async (audioBlob: Blob) => {
     try {
-      console.log('Sending audio to Supabase Edge Function...');
+      console.log('📡 Sending audio to backend. Size:', audioBlob.size);
+      
+      if (audioBlob.size === 0) {
+        throw new Error('No audio data recorded');
+      }
       
       const formData = new FormData();
-      formData.append('audio_file', audioBlob, 'recording.wav');
+      formData.append('audio_file', audioBlob, 'recording.webm');
 
-      // Use Supabase Edge Function instead of localhost
+      console.log('🚀 Calling Supabase Edge Function...');
       const { data, error } = await supabase.functions.invoke('process-audio', {
         body: formData,
       });
 
+      console.log('📥 Response received:', { data, error });
+
       if (error) {
+        console.error('❌ Supabase function error:', error);
         throw error;
       }
 
-      if (data.error) {
+      if (data?.error) {
+        console.error('❌ Backend error:', data.error);
         throw new Error(data.error);
       }
 
-      console.log('Response received:', data);
+      if (!data) {
+        throw new Error('No data received from backend');
+      }
+
+      console.log('✅ Successfully processed audio:', data);
       setResponse(data);
       
       toast({
-        title: "✨ Got your answer!",
-        description: "Check out what I found for you!",
+        title: "✨ Got Your Answer! 🎉",
+        description: "Check out what I found for you! 🌟📚",
       });
     } catch (error) {
-      console.error('Error sending audio:', error);
+      console.error('❌ Error processing audio:', error);
       toast({
-        title: "Error",
-        description: "Sorry, I couldn't process your question. Try again!",
+        title: "😔 Oops! Something Went Wrong",
+        description: "Sorry, I couldn't understand that. Try speaking louder and clearer! 🗣️💪",
         variant: "destructive",
       });
     } finally {
@@ -109,16 +189,59 @@ const Index = () => {
     }
   };
 
-  const playAudio = () => {
-    if (response?.audio_url) {
-      const audio = new Audio(response.audio_url);
-      audio.play().catch(error => {
-        console.error('Error playing audio:', error);
+  const playAudio = async () => {
+    if (!response?.audio_url) {
+      console.warn('⚠️ No audio URL available');
+      toast({
+        title: "🚫 No Audio Available",
+        description: "Sorry, there's no audio to play! 🔇",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      console.log('🔊 Playing audio:', response.audio_url.substring(0, 50) + '...');
+      setIsPlayingAudio(true);
+      
+      // Stop any existing audio
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      
+      audioRef.current = new Audio(response.audio_url);
+      
+      audioRef.current.onended = () => {
+        console.log('🎵 Audio playback ended');
+        setIsPlayingAudio(false);
+      };
+      
+      audioRef.current.onerror = (error) => {
+        console.error('❌ Audio playback error:', error);
+        setIsPlayingAudio(false);
         toast({
-          title: "Audio Error",
-          description: "Could not play the audio response.",
+          title: "🚫 Audio Error",
+          description: "Could not play the audio. Let me try to help you another way! 🤝",
           variant: "destructive",
         });
+      };
+      
+      await audioRef.current.play();
+      
+      toast({
+        title: "🎵 Playing Answer! 🔊",
+        description: "Listen to my awesome explanation! 👂✨",
+      });
+      
+      console.log('✅ Audio playback started');
+    } catch (error) {
+      console.error('❌ Error playing audio:', error);
+      setIsPlayingAudio(false);
+      toast({
+        title: "🚫 Playback Error",
+        description: "Couldn't play audio right now. Try again! 🔄",
+        variant: "destructive",
       });
     }
   };
@@ -133,14 +256,14 @@ const Index = () => {
               <Sparkles className="w-12 h-12 text-yellow-500" />
             </div>
             <h1 className="text-6xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-pink-600 bg-clip-text text-transparent">
-              Toddler AI
+              🌟 Toddler AI 🤖
             </h1>
             <div className="animate-bounce delay-150">
               <Brain className="w-12 h-12 text-pink-500" />
             </div>
           </div>
           <p className="text-2xl text-gray-700 font-medium bg-white/50 rounded-full px-6 py-3 inline-block shadow-lg">
-            Ask me anything and I'll explain it in a fun way! 🌟✨
+            🗣️ Ask me anything and I'll explain it in a fun way! 🌈✨🎯
           </p>
         </div>
 
@@ -171,7 +294,7 @@ const Index = () => {
                 } opacity-20`}></div>
                 
                 <Button
-                  onClick={isRecording ? stopRecording : startRecording}
+                  onClick={handleRecordingClick}
                   disabled={isLoading}
                   className={`w-32 h-32 rounded-full text-white font-bold text-xl border-0 transition-all duration-300 shadow-lg ${
                     isRecording 
@@ -197,13 +320,13 @@ const Index = () => {
                 {isLoading ? (
                   <>
                     <Brain className="w-8 h-8 text-yellow-500 animate-bounce" />
-                    🤔 Thinking...
+                    🤔 Thinking Hard... 💭
                     <Sparkles className="w-8 h-8 text-yellow-500 animate-bounce delay-100" />
                   </>
                 ) : isRecording ? (
                   <>
                     <Mic className="w-8 h-8 text-red-500 animate-pulse" />
-                    🎤 Listening...
+                    🎤 I'm Listening... 👂
                     <div className="flex gap-1">
                       <div className="w-2 h-6 bg-red-500 rounded animate-pulse"></div>
                       <div className="w-2 h-8 bg-red-400 rounded animate-pulse delay-100"></div>
@@ -213,15 +336,15 @@ const Index = () => {
                 ) : (
                   <>
                     <Sparkles className="w-8 h-8 text-green-500" />
-                    👆 Press to Ask!
+                    👆 Press to Ask! 🎯
                     <Brain className="w-8 h-8 text-green-500" />
                   </>
                 )}
               </h2>
               <p className="text-gray-600 text-xl font-medium">
-                {isLoading ? 'Getting you an awesome answer! 🚀' : 
-                 isRecording ? 'Say your question clearly and loudly! 📢' : 
-                 'Tap the microphone and ask me anything you want to know! 🎯'}
+                {isLoading ? 'Getting you an awesome answer! 🚀💫' : 
+                 isRecording ? 'Say your question clearly and loudly! 📢💪' : 
+                 'Tap the microphone and ask me anything you want to know! 🎯🌟'}
               </p>
             </div>
           </CardContent>
@@ -236,18 +359,18 @@ const Index = () => {
                 <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-6 rounded-2xl border-l-6 border-blue-400 shadow-lg">
                   <h3 className="text-xl font-bold text-blue-800 mb-3 flex items-center gap-2">
                     <Mic className="w-6 h-6" />
-                    🗣️ Your Question:
+                    🗣️ Your Amazing Question:
                   </h3>
-                  <p className="text-blue-700 text-lg font-medium">{response.question}</p>
+                  <p className="text-blue-700 text-lg font-medium">"{response.question}" 🤔💭</p>
                 </div>
 
                 {/* Explanation */}
                 <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-2xl border-l-6 border-green-400 shadow-lg">
                   <h3 className="text-xl font-bold text-green-800 mb-4 flex items-center gap-2">
                     <Brain className="w-6 h-6" />
-                    🧠 Here's what I know:
+                    🧠 Here's What I Know: 📚✨
                   </h3>
-                  <p className="text-green-700 text-lg leading-relaxed font-medium">{response.explanation}</p>
+                  <p className="text-green-700 text-lg leading-relaxed font-medium">{response.explanation} 🌟</p>
                 </div>
 
                 {/* Image */}
@@ -255,15 +378,15 @@ const Index = () => {
                   <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-2xl border-l-6 border-yellow-400 shadow-lg">
                     <h3 className="text-xl font-bold text-yellow-800 mb-4 flex items-center gap-2">
                       <Camera className="w-6 h-6" />
-                      🎨 Picture Time:
+                      🎨 Picture Time: 📸🌈
                     </h3>
                     <div className="flex justify-center">
                       <img 
                         src={response.image_url} 
                         alt="Illustration for your question"
-                        className="max-w-full h-72 object-contain rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-white"
+                        className="max-w-full h-72 object-contain rounded-xl shadow-xl hover:shadow-2xl transition-all duration-300 border-4 border-white transform hover:scale-105"
                         onError={(e) => {
-                          console.error('Image failed to load:', response.image_url);
+                          console.error('❌ Image failed to load:', response.image_url);
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}
                       />
@@ -276,15 +399,20 @@ const Index = () => {
                   <div className="bg-gradient-to-r from-purple-50 to-violet-50 p-6 rounded-2xl border-l-6 border-purple-400 shadow-lg">
                     <h3 className="text-xl font-bold text-purple-800 mb-4 flex items-center gap-2">
                       <Speaker className="w-6 h-6" />
-                      🔊 Listen to Me:
+                      🔊 Listen to My Voice: 🎵👂
                     </h3>
                     <div className="flex justify-center">
                       <Button
                         onClick={playAudio}
-                        className="bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800 text-white font-bold py-4 px-10 rounded-full text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                        disabled={isPlayingAudio}
+                        className={`font-bold py-4 px-10 rounded-full text-lg shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${
+                          isPlayingAudio 
+                            ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 animate-pulse' 
+                            : 'bg-gradient-to-r from-purple-500 to-purple-700 hover:from-purple-600 hover:to-purple-800'
+                        } text-white`}
                       >
-                        <Volume2 className="w-6 h-6 mr-3" />
-                        🎵 Play Audio
+                        <Volume2 className={`w-6 h-6 mr-3 ${isPlayingAudio ? 'animate-bounce' : ''}`} />
+                        {isPlayingAudio ? '🎵 Playing... 🔊' : '🎵 Play Audio 🎧'}
                       </Button>
                     </div>
                   </div>
@@ -299,7 +427,7 @@ const Index = () => {
           <div className="bg-white/70 rounded-full px-8 py-4 inline-block shadow-lg">
             <p className="text-gray-700 text-xl font-medium flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-yellow-500" />
-              Keep asking questions! Learning is fun! 
+              🎉 Keep asking questions! Learning is super fun! 📚✨
               <Brain className="w-6 h-6 text-pink-500" />
               🚀
             </p>
