@@ -29,9 +29,14 @@ serve(async (req) => {
     const question = await transcribeAudio(audioFile);
     console.log('Transcribed question:', question);
 
+    // Only proceed if we have a valid transcription
+    if (!question || question.trim().length === 0) {
+      throw new Error('Could not understand the audio. Please speak clearly and try again.');
+    }
+
     // Generate AI response using OpenAI
     const aiResponse = await generateAIResponse(question);
-    console.log('AI response generated');
+    console.log('AI response generated:', aiResponse);
 
     // Get cartoon image from Pixabay
     const imageUrl = await getCartoonImage(question);
@@ -39,7 +44,7 @@ serve(async (req) => {
 
     // Generate TTS audio using ElevenLabs
     const audioUrl = await generateTTSAudio(aiResponse);
-    console.log('Audio URL:', audioUrl);
+    console.log('Audio URL generated');
 
     const response = {
       question: question,
@@ -56,7 +61,7 @@ serve(async (req) => {
     console.error('Error processing audio:', error);
     return new Response(
       JSON.stringify({ 
-        error: 'Sorry, I couldn\'t process your question. Please try again!',
+        error: error.message || 'Sorry, I couldn\'t process your question. Please try again!',
         details: error.message 
       }), 
       {
@@ -69,9 +74,13 @@ serve(async (req) => {
 
 async function transcribeAudio(audioFile: File): Promise<string> {
   try {
+    console.log('Starting transcription with Whisper...');
+    
     const formData = new FormData();
     formData.append('file', audioFile);
     formData.append('model', 'whisper-1');
+    formData.append('language', 'en');
+    formData.append('response_format', 'text');
 
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -82,19 +91,32 @@ async function transcribeAudio(audioFile: File): Promise<string> {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI Whisper API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('OpenAI Whisper API error:', response.status, errorText);
+      throw new Error(`Transcription failed: ${response.statusText}`);
     }
 
-    const result = await response.json();
-    return result.text || 'Could not understand the question';
+    const transcriptionText = await response.text();
+    console.log('Raw transcription result:', transcriptionText);
+    
+    // Clean up the transcription
+    const cleanedText = transcriptionText.trim();
+    
+    if (!cleanedText || cleanedText.length < 2) {
+      throw new Error('No speech detected. Please speak louder and clearer.');
+    }
+
+    return cleanedText;
   } catch (error) {
     console.error('Error transcribing audio:', error);
-    return 'What is a rainbow?'; // fallback question
+    throw new Error(`Transcription failed: ${error.message}`);
   }
 }
 
 async function generateAIResponse(question: string): Promise<string> {
   try {
+    console.log('Generating AI response for question:', question);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -106,52 +128,84 @@ async function generateAIResponse(question: string): Promise<string> {
         messages: [
           {
             role: 'system',
-            content: 'You are a cheerful, educational AI assistant for toddlers. Explain things in simple, fun language that a 2-4 year old can understand. Use emojis and keep responses short (2-3 sentences). Always be positive and encouraging!'
+            content: 'You are a cheerful, educational AI assistant for toddlers aged 2-4 years old. Always answer questions in simple, fun language that toddlers can understand. Use emojis to make it more engaging. Keep your answers short (2-3 sentences maximum) and always be positive and encouraging. Make sure to directly answer the specific question asked.'
           },
           {
             role: 'user',
-            content: question
+            content: `Please answer this question from a toddler in simple words: ${question}`
           }
         ],
-        max_tokens: 150,
+        max_tokens: 200,
         temperature: 0.7,
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`AI response failed: ${response.statusText}`);
     }
 
     const result = await response.json();
-    return result.choices[0]?.message?.content || 'That\'s a wonderful question! Learning new things is so much fun! 🌟';
+    const aiAnswer = result.choices[0]?.message?.content;
+    
+    if (!aiAnswer) {
+      throw new Error('No AI response generated');
+    }
+
+    console.log('AI response generated successfully:', aiAnswer);
+    return aiAnswer.trim();
   } catch (error) {
     console.error('Error generating AI response:', error);
-    return 'That\'s a wonderful question! Learning new things is so much fun! 🌟';
+    throw new Error(`AI response failed: ${error.message}`);
   }
 }
 
 async function getCartoonImage(question: string): Promise<string> {
   try {
-    // Extract keywords from question for better image search
+    console.log('Searching for image based on question:', question);
+    
+    // Extract better keywords from the question
     const keywords = extractKeywords(question);
-    const searchQuery = `${keywords} cartoon illustration for kids`;
+    const searchQuery = `${keywords} children cartoon illustration educational`;
+    
+    console.log('Image search query:', searchQuery);
     
     const response = await fetch(
-      `https://pixabay.com/api/?key=50572087-fbb5dc460b4c14ab7e80d2ac1&q=${encodeURIComponent(searchQuery)}&image_type=illustration&category=education&safesearch=true&min_width=400&per_page=10`
+      `https://pixabay.com/api/?key=50572087-fbb5dc460b4c14ab7e80d2ac1&q=${encodeURIComponent(searchQuery)}&image_type=illustration&category=education&safesearch=true&min_width=400&per_page=20&orientation=horizontal`
     );
 
     if (!response.ok) {
-      throw new Error(`Pixabay API error: ${response.statusText}`);
+      console.error('Pixabay API error:', response.status);
+      throw new Error(`Image search failed: ${response.statusText}`);
     }
 
     const result = await response.json();
+    console.log('Pixabay search results:', result.totalHits, 'images found');
     
     if (result.hits && result.hits.length > 0) {
-      // Return a random image from the results
-      const randomIndex = Math.floor(Math.random() * result.hits.length);
-      return result.hits[randomIndex].webformatURL;
+      // Return a random image from the first few results for variety
+      const randomIndex = Math.floor(Math.random() * Math.min(result.hits.length, 5));
+      const selectedImage = result.hits[randomIndex].webformatURL;
+      console.log('Selected image URL:', selectedImage);
+      return selectedImage;
     } else {
-      // Fallback to a default educational image
+      // Try a broader search if no results
+      console.log('No specific images found, trying broader search...');
+      const broadQuery = `learning education children cartoon`;
+      
+      const broadResponse = await fetch(
+        `https://pixabay.com/api/?key=50572087-fbb5dc460b4c14ab7e80d2ac1&q=${encodeURIComponent(broadQuery)}&image_type=illustration&safesearch=true&min_width=400&per_page=10`
+      );
+      
+      if (broadResponse.ok) {
+        const broadResult = await broadResponse.json();
+        if (broadResult.hits && broadResult.hits.length > 0) {
+          return broadResult.hits[0].webformatURL;
+        }
+      }
+      
+      // Ultimate fallback
       return "https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=🌈+Learning+Fun";
     }
   } catch (error) {
@@ -161,16 +215,30 @@ async function getCartoonImage(question: string): Promise<string> {
 }
 
 function extractKeywords(question: string): string {
-  // Simple keyword extraction for better image search
-  const commonWords = ['what', 'is', 'are', 'how', 'why', 'where', 'when', 'a', 'an', 'the', 'do', 'does', 'can', 'will'];
-  const words = question.toLowerCase().split(' ').filter(word => 
-    word.length > 2 && !commonWords.includes(word)
-  );
-  return words.slice(0, 3).join(' ') || 'learning education';
+  // Remove common question words and extract meaningful terms
+  const commonWords = ['what', 'is', 'are', 'how', 'why', 'where', 'when', 'a', 'an', 'the', 'do', 'does', 'can', 'will', 'would', 'should', 'could', 'tell', 'me', 'about', 'explain'];
+  
+  // Clean and split the question
+  const words = question.toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(word => 
+      word.length > 2 && 
+      !commonWords.includes(word) && 
+      !word.match(/^\d+$/) // Remove pure numbers
+    );
+  
+  // Take the most important words (usually nouns and key terms)
+  const keywords = words.slice(0, 4).join(' ');
+  
+  console.log('Extracted keywords from question:', keywords);
+  return keywords || 'learning education';
 }
 
 async function generateTTSAudio(text: string): Promise<string> {
   try {
+    console.log('Generating TTS audio for text:', text.substring(0, 50) + '...');
+    
     const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
       method: 'POST',
       headers: {
@@ -182,27 +250,30 @@ async function generateTTSAudio(text: string): Promise<string> {
         text: text,
         model_id: 'eleven_multilingual_v2',
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.8,
-          style: 0.2,
+          stability: 0.6,
+          similarity_boost: 0.9,
+          style: 0.3,
           use_speaker_boost: true
         }
       }),
     });
 
     if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('ElevenLabs API error:', response.status, errorText);
+      throw new Error(`TTS generation failed: ${response.statusText}`);
     }
 
     // Convert audio to base64
     const arrayBuffer = await response.arrayBuffer();
     const base64Audio = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
     
+    console.log('TTS audio generated successfully, size:', arrayBuffer.byteLength, 'bytes');
+    
     // Return as data URL that can be played directly
     return `data:audio/mpeg;base64,${base64Audio}`;
   } catch (error) {
     console.error('Error generating TTS audio:', error);
-    // Return a fallback audio notification sound
-    return "https://www.soundjay.com/misc/sounds/bell-ringing-05.wav";
+    throw new Error(`TTS generation failed: ${error.message}`);
   }
 }
