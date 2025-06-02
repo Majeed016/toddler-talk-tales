@@ -76,6 +76,11 @@ async function transcribeAudio(audioFile: File): Promise<string> {
   try {
     console.log('Starting transcription with Whisper...');
     
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+    
     const formData = new FormData();
     formData.append('file', audioFile);
     formData.append('model', 'whisper-1');
@@ -85,7 +90,7 @@ async function transcribeAudio(audioFile: File): Promise<string> {
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer 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`,
+        'Authorization': `Bearer ${openaiApiKey}`,
       },
       body: formData,
     });
@@ -117,10 +122,15 @@ async function generateAIResponse(question: string): Promise<string> {
   try {
     console.log('Generating AI response for question:', question);
     
+    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer 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`,
+        'Authorization': `Bearer ${openaiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -165,6 +175,12 @@ async function getCartoonImage(question: string): Promise<string> {
   try {
     console.log('Searching for image based on question:', question);
     
+    const pixabayApiKey = Deno.env.get('PIXABAY_API_KEY');
+    if (!pixabayApiKey) {
+      console.warn('Pixabay API key not configured, using fallback image');
+      return "https://via.placeholder.com/400x300/FF6B6B/FFFFFF?text=🌈+Learning+Fun";
+    }
+    
     // Extract better keywords from the question
     const keywords = extractKeywords(question);
     const searchQuery = `${keywords} children cartoon illustration educational`;
@@ -172,7 +188,7 @@ async function getCartoonImage(question: string): Promise<string> {
     console.log('Image search query:', searchQuery);
     
     const response = await fetch(
-      `https://pixabay.com/api/?key=50572087-fbb5dc460b4c14ab7e80d2ac1&q=${encodeURIComponent(searchQuery)}&image_type=illustration&category=education&safesearch=true&min_width=400&per_page=20&orientation=horizontal`
+      `https://pixabay.com/api/?key=${pixabayApiKey}&q=${encodeURIComponent(searchQuery)}&image_type=illustration&category=education&safesearch=true&min_width=400&per_page=20&orientation=horizontal`
     );
 
     if (!response.ok) {
@@ -195,7 +211,7 @@ async function getCartoonImage(question: string): Promise<string> {
       const broadQuery = `learning education children cartoon`;
       
       const broadResponse = await fetch(
-        `https://pixabay.com/api/?key=50572087-fbb5dc460b4c14ab7e80d2ac1&q=${encodeURIComponent(broadQuery)}&image_type=illustration&safesearch=true&min_width=400&per_page=10`
+        `https://pixabay.com/api/?key=${pixabayApiKey}&q=${encodeURIComponent(broadQuery)}&image_type=illustration&safesearch=true&min_width=400&per_page=10`
       );
       
       if (broadResponse.ok) {
@@ -239,12 +255,17 @@ async function generateTTSAudio(text: string): Promise<string> {
   try {
     console.log('Generating TTS audio for text:', text.substring(0, 50) + '...');
     
+    const elevenlabsApiKey = Deno.env.get('ELEVENLABS_API_KEY');
+    if (!elevenlabsApiKey) {
+      throw new Error('ElevenLabs API key not configured');
+    }
+    
     const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/9BWtsMINqrJLrRacOk9x', {
       method: 'POST',
       headers: {
         'Accept': 'audio/mpeg',
         'Content-Type': 'application/json',
-        'xi-api-key': 'sk_9d51ab0b843fc2f51c95bb6e9abed1db664757639b2ad72a',
+        'xi-api-key': elevenlabsApiKey,
       },
       body: JSON.stringify({
         text: text,
